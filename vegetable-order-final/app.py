@@ -24,6 +24,23 @@ def generate():
 
     if doc.tables:
         table = doc.tables[0]
+for t in doc.tables:
+    first_row = [c.text for c in t.rows[0].cells]
+
+    if "菜品" in first_row:
+        table = t
+        break
+
+
+if table:
+
+    for i, dish in enumerate(dishes):
+
+        row = i + 1
+
+        if row < len(table.rows):
+            table.rows[row].cells[0].text = dish
+        
         for i, dish in enumerate(dishes):
             if i + 1 < len(table.rows):
                 table.rows[i+1].cells[0].text = dish
