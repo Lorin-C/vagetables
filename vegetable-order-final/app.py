@@ -4,7 +4,7 @@ from datetime import datetime
 import os
 
 app = Flask(__name__)
-TEMPLATE = "uploads/单子2026.docx"
+TEMPLATE = "uploads/danzi2026.docx"
 
 @app.route("/")
 def index():
