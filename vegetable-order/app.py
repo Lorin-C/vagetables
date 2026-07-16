@@ -139,65 +139,68 @@ def generate():
         doc
     )
 
-    # =========================
-    # 修改客户和日期
-    #
-    # 保留：
-    # 陈老四蔬菜批发
-    #
-    # 只修改下一行
-    # =========================
+# =========================
+# 写客户和日期
+# 保留陈老四蔬菜批发
+# 客户日期同一行
+# =========================
 
-    if len(tables) > 0:
+if len(tables) > 0:
 
+    header_table = tables[0]
 
-        header_table = tables[0]
+    for row in header_table.rows:
 
+        for cell in row.cells:
 
-        for row in header_table.rows:
+            for p in cell.paragraphs:
 
-
-            for cell in row.cells:
+                text = p.text.strip()
 
 
-                paragraphs = cell.paragraphs
+                if (
+                    "客户：" in text
+                    and
+                    "2026" in text
+                ):
 
 
-                for p in paragraphs:
+                    # 客户最多6个字
+
+                    customer = customer[:6]
 
 
-                    text = p.text.strip()
+                    # 清空原文字
+                    for run in p.runs:
+                        run.text = ""
 
 
+                    # 设置右对齐日期
 
-                    # 找客户日期这一行
-
-                    if (
-                        "客户：" in text
-                        and
-                        "2026" in text
-                    ):
+                    p.paragraph_format.tab_stops.add_tab_stop(
+                        Pt(300)
+                    )
 
 
-                        replace_paragraph(
-
-                            p,
-
-                            "客户："
-                            +
-                            customer
-                            +
-                            "               "
-                            +
-                            date,
-
-                            14
-
-                        )
+                    run = p.add_run(
+                        "客户：" 
+                        +
+                        customer
+                        +
+                        "\t"
+                        +
+                        date
+                    )
 
 
+                    set_font(
+                        run,
+                        14,
+                        True
+                    )
 
-                        break
+
+                    break
 
     # =========================
     # 找菜品列
