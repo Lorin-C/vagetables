@@ -67,7 +67,19 @@ set_font(run, 18, True)
 
     # 写入客户名称和日期，四号加粗
     header_cell = doc.tables[0].cell(0,0)
-    header_cell.text = ""
+p = header_cell.paragraphs[0]
+
+for r in p.runs:
+    r.text = ""
+
+run = p.add_run(
+    "客户：" + customer +
+    "               " +
+    date
+)
+
+set_font(run, 14, True)
+
     p = header_cell.paragraphs[0]
     r = p.add_run("陈老四蔬菜批发")
     set_font(r, 14, True)
