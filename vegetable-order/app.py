@@ -1,83 +1,257 @@
 from flask import Flask, render_template, request, send_file
 from docx import Document
-from docx.table import Table
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from datetime import datetime
+
 import os
+import datetime
+import tempfile
+
 
 app = Flask(__name__)
 
-TEMPLATE = os.path.join(os.path.dirname(__file__), "uploads", "form2026.docx")
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+TEMPLATE_PATH = os.path.join(
+    BASE_DIR,
+    "uploads",
+    "form2026.docx"
+)
+
+
+
+def set_font(run, size, bold=True):
+    """
+    设置字体
+    """
+    run.font.name = "宋体"
+    run.font.size = Pt(size)
+    run.bold = bold
+
+
+
+def write_customer_and_date(doc, customer):
+
+    today = datetime.datetime.now().strftime(
+        "%Y年%m月%d日"
+    )
+
+
+    # 遍历所有段落寻找客户和日期位置
+
+    for p in doc.paragraphs:
+
+        text = p.text
+
+
+        if "客户：" in text:
+
+            p.clear()
+
+            run = p.add_run(
+                "客户：" + customer
+            )
+
+            set_font(
+                run,
+                14,
+                True
+            )
+
+
+        elif "2026年" in text:
+
+            p.clear()
+
+            run = p.add_run(
+                today
+            )
+
+            set_font(
+                run,
+                14,
+                True
+            )
+
+
+
+def write_dishes(doc, dishes):
+
+    count = 0
+
+
+    # form2026 有多个表格
+    # 遍历所有表格寻找数字序号行
+
+    for table in doc.tables:
+
+        for row in table.rows:
+
+            cells = row.cells
+
+
+            if len(cells) < 4:
+                continue
+
+
+            first = cells[0].text.strip()
+
+
+            # 找 1-47 行
+            if first.isdigit():
+
+                num = int(first)
+
+
+                if 1 <= num <= 47:
+
+                    if count < len(dishes):
+
+                        # 只修改第一列
+
+                        cell = cells[0]
+
+
+                        cell.text = ""
+
+
+                        p = cell.paragraphs[0]
+
+
+                        run = p.add_run(
+                            str(num)
+                            + "  "
+                            + dishes[count]
+                        )
+
+
+                        set_font(
+                            run,
+                            18,
+                            True
+                        )
+
+
+                        count += 1
+
+
+
+def create_word(customer, dishes):
+
+
+    doc = Document(
+        TEMPLATE_PATH
+    )
+
+
+    # 写客户日期
+
+    write_customer_and_date(
+        doc,
+        customer
+    )
+
+
+    # 写菜品
+
+    write_dishes(
+        doc,
+        dishes
+    )
+
+
+
+    filename = (
+        "蔬菜订单_"
+        +
+        datetime.datetime.now()
+        .strftime("%Y%m%d%H%M%S")
+        +
+        ".docx"
+    )
+
+
+    output = os.path.join(
+        tempfile.gettempdir(),
+        filename
+    )
+
+
+    doc.save(
+        output
+    )
+
+
+    return output
+
+
+
 
 @app.route("/")
 def index():
-    return render_template("index.html")
 
-@app.route("/generate", methods=["POST"])
+    return render_template(
+        "index.html"
+    )
+
+
+
+@app.route(
+    "/generate",
+    methods=["POST"]
+)
 def generate():
-    customer = request.form.get("customer", "")
-    date = request.form.get("date", "")
-    items = []
 
-    # 网页粘贴菜品：每行一个菜品，只写入Word菜品列
-    pasted = request.form.get("dishes", "")
-    names = [x.strip() for x in pasted.splitlines() if x.strip()]
 
-    for i in range(47):
-        items.append({
-            "dish": names[i] if i < len(names) else ""
-        })
+    # 客户可为空
 
-    doc = Document(TEMPLATE)
+    customer = request.form.get(
+        "customer",
+        ""
+    )
 
-    # form2026实际由多个表格组成，python-docx默认只读取第一个表格
-    # 获取文档中所有表格，只修改菜品编号对应的第一列
-    all_tables = []
-    for tbl in doc._body._body.iter("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tbl"):
-        all_tables.append(Table(tbl, doc._body))
 
-    dish_cells = []
-    # 第2个表格: 1-23，第3个表格: 24-47
-    for t in all_tables[1:]:
-        for r in t.rows:
-            cells = r.cells
-            if len(cells) >= 5:
-                # 第一列是序号，第二列才是菜品
-                dish_cells.append(cells[1])
+    # 获取菜品文本
 
-    def set_font(run, size, bold=True):
-        run.font.name = "SimSun"
-        run._element.rPr.rFonts.set("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}eastAsia", "宋体")
-        run.font.size = Pt(size)
-        run.bold = bold
+    dish_text = request.form.get(
+        "dishes",
+        ""
+    )
 
-    # 写入菜品，只修改菜品列，小二加粗
-    for idx, item in enumerate(items):
-        if idx < len(dish_cells):
-            cell = dish_cells[idx]
-            cell.text = ""
-            run = cell.paragraphs[0].add_run(item["dish"])
-            set_font(run, 18, True)
 
-    # 写入客户名称和日期，四号加粗
-    header_cell = doc.tables[0].cell(0,0)
-    header_cell.text = ""
-    p = header_cell.paragraphs[0]
-    r = p.add_run("陈老四蔬菜批发")
-    set_font(r, 14, True)
+    dishes = [
+        x.strip()
+        for x in dish_text.split("\n")
+        if x.strip()
+    ]
 
-    p2 = header_cell.add_paragraph()
-    r = p2.add_run("客户：" + customer + "               " + (date if date else datetime.now().strftime("%Y年%m月%d日")))
-    set_font(r, 14, True)
 
-    out = "output/蔬菜单_" + datetime.now().strftime("%Y%m%d%H%M%S") + ".docx"
-    os.makedirs("output", exist_ok=True)
-    doc.save(out)
-    return send_file(out, as_attachment=True)
+    file_path = create_word(
+        customer,
+        dishes
+    )
+
+
+    return send_file(
+        file_path,
+        as_attachment=True
+    )
+
+
+
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+
+
+    port = int(
+        os.environ.get(
+            "PORT",
+            5000
+        )
+    )
+
+
     app.run(
         host="0.0.0.0",
         port=port
